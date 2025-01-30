@@ -23,6 +23,7 @@ func initDB() {
 	fmt.Println("Database connected")
 }
 
+// API to update campaign spend
 func updateSpend(c *gin.Context) {
 	campaignID := c.Param("campaign_id")
 	var request struct {
@@ -33,7 +34,10 @@ func updateSpend(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
+	// Race condition here due to concurrent map writes
 	campaignSpends[campaignID] += request.Spend
+
+	// Inefficient: No transactions, no concurrency safety
 	_, err := db.Exec("UPDATE campaigns SET spend = spend + $1 WHERE id = $2",
 	request.Spend, campaignID)
 	if err != nil {
@@ -43,9 +47,12 @@ func updateSpend(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Spend updated"})
 }
 
+// API to get campaign budget status
 func getBudgetStatus(c *gin.Context) {
 	campaignID := c.Param("campaign_id")
 	var budget, spend float64
+	
+	// Inefficient Query: Should only fetch required fields
 	err := db.QueryRow("SELECT budget, spend FROM campaigns WHERE id = $1",
 	campaignID).Scan(&budget, &spend)
 	if err != nil {
